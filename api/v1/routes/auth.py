@@ -62,7 +62,7 @@ def register(
         access_token=access_token,
         data={
             "user": jsonable_encoder(
-                user, exclude=["password", "is_deleted", "is_verified", "updated_at"]
+                user, exclude=["password", "is_deleted", "updated_at"]
             )
         },
     )
@@ -97,7 +97,7 @@ def register_as_super_admin(
         access_token=access_token,
         data={
             "user": jsonable_encoder(
-                user, exclude=["password", "is_deleted", "is_verified", "updated_at"]
+                user, exclude=["password", "is_deleted", "updated_at"]
             ),
         },
     )
@@ -134,7 +134,7 @@ def login(request: Request, login_request: LoginRequest, background_tasks: Backg
         access_token=access_token,
         data={
             "user": jsonable_encoder(
-                user, exclude=["password", "is_deleted", "is_verified", "updated_at"]
+                user, exclude=["password", "is_deleted", "updated_at"]
             )
         },
     )
