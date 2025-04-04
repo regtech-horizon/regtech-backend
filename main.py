@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Regtceh",
+    title="Regtech",
     description="A simple API for Regtech",
     version="1.0.0",
 )
