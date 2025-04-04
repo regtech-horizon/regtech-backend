@@ -44,7 +44,8 @@ class UserCreate(BaseModel):
     """Schema to create a user"""
 
     email: EmailStr
-    phone_number: str
+    subscription: str
+    phone_number: Optional[str] = None
     password: Annotated[
         str, StringConstraints(
             min_length=8,
@@ -132,12 +133,25 @@ class UserData(BaseModel):
     last_name: str
     is_active: bool
     is_deleted: bool
-    is_verified: bool
+    subscription: str
+    phone_number: Optional[str] = None
+    role: str
+    status: str
     is_superadmin: bool
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+# class UserData(BaseModel):
+#     first_name: Optional[str] = None
+#     last_name: Optional[str] = None
+#     email: EmailStr
+#     subscription: str
+#     phone_number: Optional[str] = None
+    
+#     class Config:
+#         from_attributes = True
 
 class UserData2(BaseModel):
     """
