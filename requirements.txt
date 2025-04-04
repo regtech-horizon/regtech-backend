@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pydantic
+itsdangerous
+python-multipart
+slowapi
+python-jose
+sqlalchemy
+fastapi_mail
+python-decouple
+premailer
+uuid7
+psycopg2
+passlib
+alembic
+bcrypt
