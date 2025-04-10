@@ -17,7 +17,7 @@ from api.utils.db_validators import check_model_existence
 from api.v1.models import User
 from api.v1.schemas import user
 from api.utils.settings import settings
-from jose import jwt
+from jose import jwt, JWTError
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -166,10 +166,6 @@ class UserService(Service):
         db.commit()
         db.refresh(user)
 
-        # # Create notification settings directly for the user
-
-
-
         return user
 
     
@@ -251,7 +247,35 @@ class UserService(Service):
         """Function to verify a hashed password"""
 
         return pwd_context.verify(secret=password, hash=hash)
+    def verify_access_token(self, access_token: str, credentials_exception):
+        """Funtcion to decode and verify access token"""
 
+        try:
+            payload = jwt.decode(
+                access_token,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+            user_id = payload.get("user_id")
+            token_type = payload.get("type")
+
+            if user_id is None:
+                raise credentials_exception
+
+            if token_type == "refresh":
+                raise HTTPException(
+                    detail="Refresh token not allowed", status_code=400
+                )
+
+            token_data = user.TokenData(id=user_id)
+
+        except JWTError as err:
+            print(err)
+            raise credentials_exception
+
+        return token_data
+
+    
     def get_current_user(
         self,
         access_token: str = Depends(oauth2_scheme),

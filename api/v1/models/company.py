@@ -1,7 +1,7 @@
 from api.v1.models.base_model import BaseTableModel
 from uuid_extensions import uuid7
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, String, text, Boolean, Index, ForeignKey, Numeric, ARRAY
+from sqlalchemy import Column, String, text, Boolean, Index, ForeignKey, Numeric, ARRAY, JSON
 
 class Company(BaseTableModel):
     __tablename__ = "companies"
@@ -17,7 +17,9 @@ class Company(BaseTableModel):
     year_founded = Column(Numeric, nullable=True)
     headquarters = Column(String, nullable=True)
     description = Column(String, nullable=True)
-    social_media = Column(ARRAY(String), nullable=True)
+    social_media_linkedIn = Column(String, nullable=True)
+    social_media_ig = Column(String, nullable=True)
+    social_media_X = Column(String, nullable=True)
     status = Column(String, nullable=False, default="active")
     logo = Column(String, nullable=True)
     services = Column(String, nullable=True)
