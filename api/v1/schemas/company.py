@@ -45,7 +45,9 @@ class CompanyUpdate(BaseModel):
     social_media_ig: Optional[str] = None
     social_media_X: Optional[str] = None
     status: Optional[str] = None
-
+class CompanyLogin(BaseModel):
+    email: EmailStr
+    password: str
 class CompanyInDB(CompanyBase):
     id: str
     creator_id: str

@@ -5,12 +5,23 @@ from uuid_extensions import uuid7
 import json
 
 from api.v1.models.company import Company
-from api.v1.schemas.company import CompanyCreate, CompanyUpdate, CompanyInDB
+from api.v1.schemas.company import CompanyCreate, CompanyUpdate, CompanyInDB, CompanyLogin
 from api.core.base.services import Service
 
 class CompanyService(Service):
     def create(self, db: Session, *, creator_id: str, company_in: CompanyCreate) -> Company:
         """Create a new company"""
+        # Check if company with same email already exists
+        if company_in.company_email:
+            existing_company = db.query(Company).filter(
+                Company.company_email == company_in.company_email
+            ).first()
+            if existing_company:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Company with this email already exists"
+                )
+
         # Convert the company_in to a dictionary
         company_data = company_in.model_dump()
         
@@ -23,7 +34,7 @@ class CompanyService(Service):
         # Map fields from company_data to db_company_data
         field_mapping = {
             "company_type": "company_type",
-            "company_name": "company_name",
+            "company_name": "company_name", 
             "company_email": "company_email",
             "company_phone": "company_phone",
             "company_website": "company_website",
@@ -95,9 +106,17 @@ class CompanyService(Service):
         db.refresh(company)
         return company
 
-    def fetch(self, db: Session, company_id: str) -> Optional[Company]:
-        """Get a company by ID"""
-        return db.query(Company).filter(Company.id == company_id).first()
+    def fetch(self, db: Session, *, company_login: CompanyLogin, user_id: str) -> Optional[Company]:
+        """Login in"""
+        company = db.query(Company).filter(Company.company_email == company_login.email,
+        Company.creator_id == user_id,
+        Company.company_password == company_login.password).first()
+        if not company:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not found"
+            )
+        return company
 
     def fetch_all(
         self, 
