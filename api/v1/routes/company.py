@@ -46,3 +46,11 @@ async def login_company(
         data=company_login
     )
 
+
+@company_router.get("/all")
+async def get_all_companies(
+    db: Session = Depends(get_db),
+    status = "active"
+):
+    companies = company_service.fetch_all(db, status=status)
+    return companies

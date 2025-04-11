@@ -122,15 +122,31 @@ class CompanyService(Service):
         self, 
         db: Session, 
         *, 
-        skip: int = 0, 
-        limit: int = 100,
         status: Optional[str] = "active"
     ) -> List[Company]:
         """Get list of companies with optional filtering"""
         query = db.query(Company)
         if status:
-            query = query.filter(Company.status == status)
-        return query.offset(skip).limit(limit).all()
+            query = query.filter(Company.status == status).all()
+        companies = []
+        i = 0
+        for company in query:
+            companies.append({
+                "id": i,
+                "name": company.company_name,
+                "website": company.company_website,
+                "services": company.services if company.services else "None",
+                "lastFundingDate": company.last_funding_date,
+                "employees": company.company_size,
+                "acquisitions": 1,
+                "niche": company.niche,
+                "type": company.company_type,
+                "location": company.headquarters,
+                "logo": company.logo,
+            })
+            i += 1
+        query = companies
+        return query
 
     def update(
         self, 
