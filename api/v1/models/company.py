@@ -16,6 +16,7 @@ class Company(BaseTableModel):
     company_size = Column(String, nullable=True)
     year_founded = Column(Numeric, nullable=True)
     headquarters = Column(String, nullable=True)
+    country = Column(String, nullable=True)
     description = Column(String, nullable=True)
     social_media_linkedIn = Column(String, nullable=True)
     social_media_ig = Column(String, nullable=True)

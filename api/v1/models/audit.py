@@ -2,7 +2,7 @@ from api.v1.models.base_model import BaseTableModel
 from uuid_extensions import uuid7
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, String, text, Boolean, Index, ForeignKey, Numeric, DateTime, Text
-from datetime import datetime
+from datetime import datetime, timezone
 
 class AuditTrail(BaseTableModel):
     __tablename__ = "audit_trail"
@@ -12,7 +12,7 @@ class AuditTrail(BaseTableModel):
     description = Column(Text, nullable=False)
     affected_table = Column(String, nullable=False)
     affected_record_id = Column(String, nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     admin = relationship("User", back_populates="audit_trails")

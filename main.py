@@ -12,6 +12,8 @@ from starlette.middleware.sessions import SessionMiddleware  # required by googl
 from api.utils.json_response import JsonResponseDict
 from api.v1.routes import api_version_one
 from api.utils.settings import settings
+from api.v1.routes.flutterwave_webhook import router as webhook_router
+
 
 
 @asynccontextmanager
@@ -53,6 +55,8 @@ app.add_middleware(
 )
 
 app.include_router(api_version_one)
+app.include_router(webhook_router)
+
 
 
 @app.get("/", tags=["Home"])

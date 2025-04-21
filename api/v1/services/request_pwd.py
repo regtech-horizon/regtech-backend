@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, Depends, status
@@ -67,7 +67,7 @@ class RequestPasswordService(Service):
         Returns:
             password_reset_token: password reset token
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expire = now + timedelta(minutes=5)
         payload = {"email": user.email, "jti": user.id,
                    "iat": now, "exp": expire}

@@ -2,13 +2,13 @@ from api.v1.models.base_model import BaseTableModel
 from uuid_extensions import uuid7
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, String, text, Boolean, Index, ForeignKey, Numeric, DateTime, Float
-from datetime import datetime
+from datetime import datetime, timezone
 class Payment(BaseTableModel):
     __tablename__ = "payments"
     
     subscription_id = Column(String, ForeignKey("subscriptions.id"), nullable=False)
     amount = Column(Float, nullable=False)
-    payment_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    payment_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     payment_method = Column(String, nullable=False)
     status = Column(String, nullable=False, default="pending")
     invoice_url = Column(String, nullable=True)
