@@ -1,7 +1,7 @@
 import random
-import string
 from typing import Any, Optional, Annotated
 import datetime as dt
+from uuid import UUID
 from fastapi import status
 from fastapi.security import OAuth2PasswordBearer
 # from jose import JWTError, jwt
@@ -239,24 +239,21 @@ class UserService(Service):
 
     def hash_password(self, password: str) -> str:
         """Function to hash a password"""
-
         hashed_password = pwd_context.hash(secret=password)
         return hashed_password
 
     def verify_password(self, password: str, hash: str) -> bool:
         """Function to verify a hashed password"""
-
         return pwd_context.verify(secret=password, hash=hash)
+    
     def verify_access_token(self, access_token: str, credentials_exception):
-        """Funtcion to decode and verify access token"""
-
         try:
             payload = jwt.decode(
                 access_token,
                 settings.SECRET_KEY,
                 algorithms=[settings.ALGORITHM],
             )
-            user_id = payload.get("user_id")
+            user_id = payload.get("user_id")  # Key in JWT payload
             token_type = payload.get("type")
 
             if user_id is None:
@@ -267,40 +264,51 @@ class UserService(Service):
                     detail="Refresh token not allowed", status_code=400
                 )
 
-            token_data = user.TokenData(id=user_id)
-
+            token_data = user.TokenData(user_id=user_id, type=token_type)
         except JWTError as err:
             print(err)
             raise credentials_exception
-
+        
         return token_data
-
+    
     
     def get_current_user(
         self,
         access_token: str = Depends(oauth2_scheme),
         db: Session = Depends(get_db),
     ) -> User:
-        """Function to get current logged in user"""
-
         credentials_exception = HTTPException(
             status_code=401,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+        
+        print(access_token)
 
         token = self.verify_access_token(access_token, credentials_exception)
-        user = db.query(User).filter(User.id == token.id).first()
+        
+        try:
+            # Convert string `user_id` to UUID
+            # user_uuid = UUID(token.user_id)  # <-- Use `user_id`
+            user_uuid = (token.user_id)  # <-- Use `user_id`
+            print(user_uuid)
+        except ValueError:
+            raise credentials_exception
+
+        # user = db.query(User).filter(User.id == user_uuid).first()
+        user = db.query(User).filter(User.id == str(user_uuid)).first()
+        # user = db.query(User).filter(User.id == user_uuid).first()
+
+        if not user:
+            raise credentials_exception
 
         return user
     
     def create_access_token(self, user_id: str) -> str:
-        """Function to create access token"""
-
         expires = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
-        data = {"user_id": user_id, "exp": expires, "type": "access"}
+        data = {"user_id": user_id, "exp": expires, "type": "access"}  # Key: `user_id`
         encoded_jwt = jwt.encode(data, settings.SECRET_KEY, settings.ALGORITHM)
         return encoded_jwt
     
@@ -345,15 +353,15 @@ class UserService(Service):
         new_password: str,
         user: User,
         db: Session,
-        old_password: Optional[str] = None,
+        current_password: Optional[str] = None,
     ):
         """Endpoint to change the user's password"""
-        if old_password == new_password:
+        if current_password == new_password:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Old Password and New Password cannot be the same",
+                detail="Current Password and New Password cannot be the same",
             )
-        if old_password is None:
+        if current_password is None:
             if user.password is None:
                 user.password = self.hash_password(new_password)
                 db.commit()
@@ -361,15 +369,32 @@ class UserService(Service):
             else:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Old Password must not be empty, unless setting password for the first time.",
+                    detail="Current Password must not be empty, unless setting password for the first time.",
                 )
-        elif not self.verify_password(old_password, user.password):
+        elif not self.verify_password(current_password, user.password):
             raise HTTPException(
-                status_code=400, detail="Incorrect old password"
+                status_code=400, detail="Incorrect current password"
             )
         else:
             user.password = self.hash_password(new_password)
             db.commit()
+
+    def get_current_super_admin(
+        self,
+        access_token: str = Depends(oauth2_scheme),
+        db: Session = Depends(get_db),
+    ) -> User:
+        """Function to get current logged in superadmin user"""
+        user = self.get_current_user(access_token, db)
+        
+        if not user.is_superadmin:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied. Super admin privileges required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        return user
 
 
 user_service = UserService()

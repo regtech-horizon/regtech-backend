@@ -35,6 +35,7 @@ class UserBase(BaseModel):
     last_name: str
     email: EmailStr
     created_at: datetime
+    avatar: Optional[str] = None
 
 class UserEmailSender(BaseModel):
     email: EmailStr
@@ -119,9 +120,10 @@ class UserCreate(BaseModel):
         return values
 
 class UserUpdate(BaseModel):
-    
     first_name : Optional[str] = None
     last_name : Optional[str] = None
+    avatar: Optional[str] = None
+    phone_number: Optional[str] = None
 
 class UserData(BaseModel):
     """
@@ -315,11 +317,9 @@ class EmailRequest(BaseModel):
 class Token(BaseModel):
     token: str
 
-
 class TokenData(BaseModel):
-    """Schema to structure token data"""
-
-    id: Optional[str]
+    user_id: str
+    type: Optional[str] = "access"
 
 
 class DeactivateUserSchema(BaseModel):
@@ -329,68 +329,27 @@ class DeactivateUserSchema(BaseModel):
     confirmation: bool
 
 
+# schemas/user.py
+from pydantic import BaseModel, Field, field_validator
+
 class ChangePasswordSchema(BaseModel):
-    """Schema for changing password of a user"""
+    current_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=8)
+    confirm_new_password: str = Field(..., min_length=8)
 
-    old_password: Annotated[
-        Optional[str],
-        StringConstraints(min_length=8,
-                          max_length=64,
-                          strip_whitespace=True)
-    ] = None
+    @field_validator('new_password')
+    def validate_password_complexity(cls, v):
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain uppercase letters')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain numbers')
+        return v
 
-    new_password: Annotated[
-        str,
-        StringConstraints(min_length=8,
-                          max_length=64,
-                          strip_whitespace=True)
-    ]
-
-    confirm_new_password: Annotated[
-        str,
-        StringConstraints(min_length=8,
-                          max_length=64,
-                          strip_whitespace=True)
-    ]
-
-    @model_validator(mode='before')
-    @classmethod
-    def validate_password(cls, values: dict):
-        """
-        Validates passwords
-        """
-        old_password = values.get('old_password')
-        new_password = values.get('new_password')
-        confirm_new_password = values.get("confirm_new_password")
-
-        if (old_password and old_password.strip() == '') or old_password == '':
-            values['old_password'] = None
-        # constraints for old_password
-        if old_password and old_password.strip():
-            if not any(c.islower() for c in old_password):
-                raise ValueError("Old password must include at least one lowercase character")
-            if not any(c.isupper() for c in old_password):
-                raise ValueError("Old password must include at least one uppercase character")
-            if not any(c.isdigit() for c in old_password):
-                raise ValueError("Old password must include at least one digit")
-            if not any(c in ['!','@','#','$','%','&','*','?','_','-'] for c in old_password):
-                raise ValueError("Old password must include at least one special character")
-
-        # constraints for new_password
-        if not any(c.islower() for c in new_password):
-            raise ValueError("New password must include at least one lowercase character")
-        if not any(c.isupper() for c in new_password):
-            raise ValueError("New password must include at least one uppercase character")
-        if not any(c.isdigit() for c in new_password):
-            raise ValueError("New password must include at least one digit")
-        if not any(c in ['!','@','#','$','%','&','*','?','_','-'] for c in new_password):
-            raise ValueError("New password must include at least one special character")
-        
-        if confirm_new_password != new_password:
-            raise ValueError("New Password and Confirm New Password must match")
-        
-        return values
-
+    @model_validator(mode='after')
+    def validate_passwords_match(self):
+        if self.new_password != self.confirm_new_password:
+            raise ValueError('Passwords do not match')
+        return self
 
 class ChangePwdRet(BaseModel):
     """schema for returning change password response"""

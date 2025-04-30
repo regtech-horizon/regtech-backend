@@ -26,6 +26,6 @@ class AuthService(Service):
         )
 
         token = user_service.verify_access_token(magic_token, credentials_exception)
-        user = db.query(User).filter(User.id == token.id).first()
+        user = db.query(User).filter(User.id == str(token.user_id)).first()
         
         return user, magic_token

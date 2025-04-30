@@ -1,51 +1,116 @@
 from typing import Annotated, Optional, Literal
-from fastapi import Depends, APIRouter, Request, status, Query, HTTPException
+from fastapi import Depends, APIRouter, Request, logger, status, Query, HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from api.utils.success_response import success_response
+from api.v1.models.activity_log import ActivityLog
+from api.v1.models.company import Company
+from api.v1.models.notification import Notification
 from api.v1.models.user import User
 from api.v1.schemas.user import (
-    AllUsersResponse, UserUpdate,
+    AllUsersResponse, ChangePasswordSchema, UserUpdate,
     AdminCreateUserResponse, AdminCreateUser
 )
 from api.db.database import get_db
 from api.v1.services.user import user_service
+from api.v1.services.notification import NotificationService, get_notification_service
 
 
 user_router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@user_router.delete('/delete', status_code=200)
-async def delete_account(request: Request, db: Session = Depends(get_db), current_user: User = Depends(user_service.get_current_user), user_id: Optional[str] = Query(None),):
-    '''Endpoint to delete a user account'''
-
+@user_router.delete('/delete', status_code=status.HTTP_200_OK)
+async def delete_account(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(user_service.get_current_user),
+    user_id: Optional[str] = None
+):
+    """
+    Endpoint to delete a user account
+    
+    Args:
+        request: The incoming request
+        db: Database session
+        current_user: Currently authenticated user
+        user_id: Optional user ID to delete (admin only)
+        
+    Returns:
+        Success response or error
+        
+    Raises:
+        HTTPException: 401 if unauthorized
+        HTTPException: 403 if forbidden
+        HTTPException: 404 if user not found
+    """
+    # Extract token for self-deletion case
     auth_header = request.headers.get("Authorization")
     access_token = (
-        auth_header.replace("Bearer ", "") if auth_header and auth_header.startswith("Bearer ") else None # this extracts access token from header but or returns None if header is missing or not in the right format
+        auth_header.split("Bearer ")[1] 
+        if auth_header and auth_header.startswith("Bearer ") 
+        else None
     )
 
+    # Admin deletion flow
     if user_id:
-        if not current_user.is_superadmin:  # Check if the logged-in user is an admin
-            raise HTTPException(status_code=401, detail="Only admins can delete users by ID.")
-        access_token = None # basically ignore the access token if user_id is provided (but it still has to be provided by an auth admin)
+        if not current_user.is_superadmin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can delete other users"
+            )
+        target_user = user_service.fetch(db, id=user_id)
+        if not target_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+            
+        # Prevent admins from deleting themselves via this endpoint
+        if str(target_user.id) == str(current_user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admins must use the profile deletion flow"
+            )
+            
+        user_service.delete(db, id=user_id)
+        return success_response(
+            message=f"User {user_id} deleted successfully",
+            status_code=status.HTTP_200_OK
+        )
 
-    # Delete current user
-    user_service.delete(db=db, id=user_id, access_token=access_token)
-
-    return success_response(
-        status_code=200,
-        message='User successfully deleted',
-    )
-
+    # Self-deletion flow
+    try:
+        user_service.delete(db, id=str(current_user.id), access_token=access_token)
+        return success_response(
+            message="Your account has been deleted successfully",
+            status_code=status.HTTP_200_OK
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    
 @user_router.patch("",status_code=status.HTTP_200_OK)
 def update_current_user(
     current_user : Annotated[User , Depends(user_service.get_current_user)],
     schema : UserUpdate,
     db : Session = Depends(get_db),
+    notification_service: NotificationService = Depends(get_notification_service)
 ):
 
     user = user_service.update(db=db, schema= schema, current_user=current_user)
+
+    
+    message = f"The following data has been updated successfully: {', '.join([key for key in schema.dict() if schema.dict()[key] is not None])}"
+    notification_service.create_notification(
+        title="User Updated", 
+        message=message, 
+        user_id=current_user.id,
+        category="system",
+        priority=1
+    )
 
     return success_response(
         status_code=status.HTTP_200_OK,
@@ -59,17 +124,26 @@ def update_current_user(
 
 @user_router.patch("/{user_id}", status_code=status.HTTP_200_OK)
 def update_user(
-    user_id : str,
-    current_user : Annotated[User , Depends(user_service.get_current_super_admin)],
-    schema : UserUpdate,
-    db : Session = Depends(get_db)
+    user_id: str,
+    current_user: Annotated[User, Depends(user_service.get_current_super_admin)],
+    schema: UserUpdate,
+    db: Session = Depends(get_db),
+    notification_service: NotificationService = Depends(get_notification_service)
 ):
     user = user_service.update(db=db, schema=schema, id=user_id, current_user=current_user)
 
+    message = f"The following data has been updated successfully: {', '.join([key for key in schema.dict() if schema.dict()[key] is not None])}"
+    notification_service.create_notification(
+        title="User Updated", 
+        message=message, 
+        user_id=user_id,
+        category="system",
+        priority=1
+    )
     return success_response(
         status_code=status.HTTP_200_OK,
         message='User Updated Successfully',
-        data= jsonable_encoder(
+        data=jsonable_encoder(
             user,
             exclude=['password', 'is_superadmin', 'is_deleted', 'is_verified', 'updated_at', 'created_at', 'is_active']
         )
@@ -210,3 +284,19 @@ def get_user_by_id(
             exclude=['password', 'is_superadmin', 'is_deleted', 'is_verified', 'updated_at', 'created_at', 'is_active']
         )
     )
+
+@user_router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    schema: ChangePasswordSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(user_service.get_current_user)
+):
+    user_service.change_password(
+        db=db,
+        user=current_user,
+        current_password=schema.current_password ,
+        new_password=schema.new_password
+    )
+
+    return {"message": "Password updated successfully"}
+

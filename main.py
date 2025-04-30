@@ -1,7 +1,7 @@
 import uvicorn
 from fastapi.staticfiles import StaticFiles
 import uvicorn, os
-from fastapi import  Request
+from fastapi import  Query, Request, WebSocket
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.staticfiles import StaticFiles
@@ -13,8 +13,9 @@ from api.utils.json_response import JsonResponseDict
 from api.v1.routes import api_version_one
 from api.utils.settings import settings
 from api.v1.routes.flutterwave_webhook import router as webhook_router
+from api.v1.routes.company import public_router as company_public
 
-
+from api.v1.services.notification import websocket_endpoint
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,12 +53,20 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # expose_headers=["*"]
 )
 
 app.include_router(api_version_one)
 app.include_router(webhook_router)
+app.include_router(company_public)
 
-
+@app.websocket("/ws/notifications/{user_id}")
+async def websocket_notifications(
+    websocket: WebSocket,
+    user_id: int,
+    token: str = Query(...)
+):
+    await websocket_endpoint(websocket, user_id, token)
 
 @app.get("/", tags=["Home"])
 async def get_root(request: Request) -> dict:

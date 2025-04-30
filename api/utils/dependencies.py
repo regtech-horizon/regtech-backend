@@ -15,7 +15,8 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
 
 
 def get_current_user(
@@ -38,7 +39,7 @@ def get_current_user(
         logger.error(f"JWT error: {e}")
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == str(user_id)).first()
     if user is None:
         logger.error("User not found")
         raise credentials_exception

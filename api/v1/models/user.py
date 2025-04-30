@@ -13,6 +13,7 @@ class User(BaseTableModel):
     last_name = Column(String, nullable=True)
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=True)
+    avatar = Column(String, nullable=True)
     
     is_active = Column(Boolean, server_default=text("true"))
     is_superadmin = Column(Boolean, server_default=text("false"))
@@ -23,6 +24,7 @@ class User(BaseTableModel):
     subscription = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
 
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     companies = relationship("Company", back_populates="creator", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="user", cascade="all, delete-orphan")
     subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")

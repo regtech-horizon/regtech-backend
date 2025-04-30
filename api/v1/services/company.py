@@ -1,12 +1,16 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from sqlalchemy import func, text, bindparam, text, or_
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from uuid_extensions import uuid7
-import json
-
+from sqlalchemy.dialects.postgresql import JSONB
 from api.v1.models.company import Company
 from api.v1.schemas.company import CompanyCreate, CompanyUpdate, CompanyInDB, CompanyLogin
 from api.core.base.services import Service
+
+DEFAULT_PAGE = 1
+DEFAULT_PER_PAGE = 10  # We had used 10 items per page
+MAX_PER_PAGE = 100
 
 class CompanyService(Service):
     def create(self, db: Session, *, creator_id: str, company_in: CompanyCreate) -> Company:
@@ -81,23 +85,13 @@ class CompanyService(Service):
             if social_media_X:
                 db_company_data['social_media_X'] = social_media_X
         
-        # Handle services field - ensure it's a string
-        if 'services' in company_data and company_data['services'] is not None:
-            if isinstance(company_data['services'], list):
-                db_company_data['services'] = ', '.join(company_data['services'])
-            else:
-                db_company_data['services'] = str(company_data['services'])
-        
+        # Handle services field - ensure it's an array
+        if 'services' in company_data:
+            db_company_data['services'] = company_data['services']
+
         # Handle founders field - ensure it's a proper array
         if 'founders' in company_data:
-            if company_data['founders'] is None:
-                db_company_data['founders'] = []
-            elif isinstance(company_data['founders'], str):
-                db_company_data['founders'] = [company_data['founders']]
-            elif isinstance(company_data['founders'], list):
-                db_company_data['founders'] = company_data['founders']
-            else:
-                db_company_data['founders'] = [str(company_data['founders'])]
+            db_company_data['founders'] = company_data['founders']
         
         # Create the company with the processed data
         company = Company(**db_company_data)
@@ -122,32 +116,42 @@ class CompanyService(Service):
         self, 
         db: Session, 
         *, 
-        status: Optional[str] = "active"
-    ) -> List[Company]:
-        """Get list of companies with optional filtering"""
-        query = db.query(Company)
+        status: Optional[str] = "active",
+        page: int = DEFAULT_PAGE,
+        per_page: int = DEFAULT_PER_PAGE
+    ) -> Tuple[List[dict], int]:
+        """Get paginated and filtered list of companies."""
+        # Create the base query
+        base_query = db.query(Company)
         if status:
-            query = query.filter(Company.status == status).all()
-        companies = []
-        i = 0
-        for company in query:
-            companies.append({
-                "id": i,
+            base_query = base_query.filter(Company.status == status)
+        
+        # Get total count before pagination
+        total_count = base_query.count()
+        
+        # Apply pagination to get the results
+        companies = base_query.offset((page - 1) * per_page).limit(per_page).all()
+        
+        result = []
+        for company in companies:
+            result.append({
+                "id": company.id,
                 "name": company.company_name,
                 "website": company.company_website,
-                "services": company.services if company.services else "None",
+                "services": [
+                            [{"name": s["name"], "description": s["description"]}  # Map to objects
+                            for s in (company.services if company.services else [])]
+                        ],
                 "lastFundingDate": company.last_funding_date,
                 "employees": company.company_size,
-                "acquisitions": 1,
+                "acquisitions": 0,  # Placeholder for actual logic
                 "niche": company.niche,
                 "type": company.company_type,
-                "location": company.headquarters,
+                "location": company.country,
                 "logo": company.logo,
             })
-            i += 1
-        query = companies
-        return query
-
+        return result, total_count
+    
     def update(
         self, 
         db: Session,
@@ -172,6 +176,7 @@ class CompanyService(Service):
             "company_size": "company_size",
             "year_founded": "year_founded",
             "headquarters": "headquarters",
+            "country": "country",
             "description": "description",
             "logo": "logo",
             "social_media_linkedIn": "social_media_linkedIn",
@@ -212,23 +217,13 @@ class CompanyService(Service):
             if social_media_X:
                 db_update_data['social_media_X'] = social_media_X
         
-        # Handle services field - ensure it's a string
-        if 'services' in update_data and update_data['services'] is not None:
-            if isinstance(update_data['services'], list):
-                db_update_data['services'] = ', '.join(update_data['services'])
-            else:
-                db_update_data['services'] = str(update_data['services'])
-        
+        # Handle services field - ensure it's an array
+        if 'services' in update_data:
+            db_update_data['services'] = update_data['services']
+                
         # Handle founders field - ensure it's a proper array
         if 'founders' in update_data:
-            if update_data['founders'] is None:
-                db_update_data['founders'] = []
-            elif isinstance(update_data['founders'], str):
-                db_update_data['founders'] = [update_data['founders']]
-            elif isinstance(update_data['founders'], list):
-                db_update_data['founders'] = update_data['founders']
-            else:
-                db_update_data['founders'] = [str(update_data['founders'])]
+            db_update_data['founders'] = update_data['founders']
         
         # Update the company with the processed data
         for field, value in db_update_data.items():
@@ -272,20 +267,132 @@ class CompanyService(Service):
         self,
         db: Session,
         *,
-        search_term: str,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Company]:
-        """Search companies by name or description"""
-        return (
-            db.query(Company)
-            .filter(
-                (Company.name.ilike(f"%{search_term}%")) |
-                (Company.description.ilike(f"%{search_term}%"))
+        search_term: Optional[str] = None,
+        country: Optional[str] = None,
+        size: Optional[str] = None,
+        niche: Optional[str] = None,
+        year_founded_min: Optional[int] = None,
+        year_founded_max: Optional[int] = None,
+        sort_by: str = "relevance",
+        page: int = DEFAULT_PAGE,
+        per_page: int = DEFAULT_PER_PAGE
+    ) -> Tuple[List[Company], int]:
+        """Search companies with pagination and filters"""
+        
+        # Base query
+        query = db.query(
+            Company.id,
+            Company.company_name.label("name"),  # Alias company_name → name
+            Company.company_website.label("website"),
+            Company.last_funding_date.label("lastFundingDate"),
+            Company.company_size.label("employees"),
+            Company.acquisitions,
+            Company.company_type.label("type"),
+            Company.country,
+            Company.logo,
+            Company.niche,
+            Company.services,
+            Company.founders
+        ).filter((Company.status == "active") | (Company.status == "completed"))
+        
+        # Text search
+        if search_term:
+
+            jsonb_condition = text("""
+                jsonb_path_exists(services, :services_path) OR 
+                jsonb_path_exists(founders, :founders_path)
+            """).bindparams(
+                bindparam('services_path', value={
+                    "term": f"{search_term}",
+                    "path": '$[*] ? (@.name like_regex $term || ".*" flag "i" || @.description like_regex $term || ".*" flag "i")'
+                }, type_=JSONB),
+                bindparam('founders_path', value={
+                    "term": f"{search_term}",
+                    "path": '$[*] ? (@.name like_regex $term || ".*" flag "i" || @.role like_regex $term || ".*" flag "i" || @.bio like_regex $term || ".*" flag "i")'
+                }, type_=JSONB)
             )
-            .offset(skip)
-            .limit(limit)
-            .all()
+
+            name_filter = Company.company_name.ilike(f"%{search_term}%")
+            desc_filter = Company.description.ilike(f"%{search_term}%")
+            country_filter = Company.country.ilike(f"%{search_term}%")
+            
+            # New service filter using JSONB path
+            # service_filter = func.jsonb_path_exists(
+            #     Company.services,
+            #     text("""$[*] ? (
+            #         @.name like_regex :term || '.*' flag "i" || 
+            #         @.description like_regex :term || '.*' flag "i"
+            #     )"""),  # Handles partial matches
+            #     {'term': search_term}
+            # )
+
+            # founder_filter = func.jsonb_path_exists(
+            #     Company.founders,
+            #     text("""$[*] ? (
+            #         @.name like_regex :term || '.*' flag "i" ||
+            #         @.role like_regex :term || '.*' flag "i" ||
+            #         @.bio like_regex :term || '.*' flag "i"
+            #     )"""),
+            #     {'term': search_term}
+            # )
+            
+            query = query.filter(or_(
+            name_filter,
+            desc_filter,
+            country_filter,
+            jsonb_condition
         )
+            )
+        
+        # Apply filters
+        if country:
+            countries = [country.strip() for country in country.split(",")]
+            # Use OR condition for multiple countries
+            country_filters = [Company.country.ilike(f"%{c}%") for c in countries]
+            query = query.filter(or_(*country_filters))
+        
+        if size:
+            sizes = [size.strip() for size in size.split(",")]
+            size_filters = [Company.company_size == s for s in sizes]
+            query = query.filter(or_(*size_filters))
+        
+        if niche:
+            niches = [n.strip() for n in niche.split(",")]
+            niche_filters = [Company.niche == n for n in niches]
+            query = query.filter(or_(*niche_filters))
+        
+        if year_founded_min:
+            query = query.filter(Company.year_founded >= year_founded_min)
+        
+        if year_founded_max:
+            query = query.filter(Company.year_founded <= year_founded_max)
+        
+        # Apply sorting
+        if sort_by == "name":
+            query = query.order_by(Company.company_name)
+        elif sort_by == "founded":
+            query = query.order_by(Company.year_founded.desc())
+        elif sort_by == "employees":
+            query = query.order_by(Company.company_size.desc())
+        else:  # relevance
+            query = query.order_by(Company.created_at.desc())
+        
+        # Get total count before pagination
+        total_count = query.count()
+        
+        # Apply pagination
+        companies = query.offset((page - 1) * per_page).limit(per_page).all()
+        
+        return companies, total_count
+
+    def get_company(self, db: Session, *, company_id: str) -> Company:
+        """Get a company by ID."""
+        company = db.query(Company).filter(Company.id == company_id).first()
+        if not company:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not found"
+            )
+        return company
 
 company_service = CompanyService()
