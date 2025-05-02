@@ -1,9 +1,9 @@
 from typing import List, Optional, Tuple
-from sqlalchemy import func, text, bindparam, text, or_
+from sqlalchemy import func, text, or_
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from uuid_extensions import uuid7
-from sqlalchemy.dialects.postgresql import JSONB
+import json
 from api.v1.models.company import Company
 from api.v1.schemas.company import CompanyCreate, CompanyUpdate, CompanyInDB, CompanyLogin
 from api.core.base.services import Service
@@ -134,14 +134,17 @@ class CompanyService(Service):
         
         result = []
         for company in companies:
+            # Create properly formatted services array - remove the extra nesting
+            services_array = [
+                {"name": s["name"], "description": s["description"]}
+                for s in (company.services if company.services else [])
+            ]
+
             result.append({
                 "id": company.id,
                 "name": company.company_name,
                 "website": company.company_website,
-                "services": [
-                            [{"name": s["name"], "description": s["description"]}  # Map to objects
-                            for s in (company.services if company.services else [])]
-                        ],
+                "services": services_array,  # Use the properly formatted array
                 "lastFundingDate": company.last_funding_date,
                 "employees": company.company_size,
                 "acquisitions": 0,  # Placeholder for actual logic
@@ -152,87 +155,33 @@ class CompanyService(Service):
             })
         return result, total_count
     
-    def update(
-        self, 
-        db: Session,
-        *,
-        company: Company,
-        company_in: CompanyUpdate
-    ) -> Company:
-        """Update a company"""
-        update_data = company_in.model_dump(exclude_unset=True)
-        
-        # Create a new dictionary with only the fields we want to update
-        db_update_data = {}
-        
-        # Map fields from update_data to db_update_data
-        field_mapping = {
-            "name": "company_name",
-            "company_type": "company_type",
-            "contact_name": "company_name",  # Assuming this maps to company_name
-            "email": "company_email",
-            "phone": "company_phone",
-            "website": "company_website",
-            "company_size": "company_size",
-            "year_founded": "year_founded",
-            "headquarters": "headquarters",
-            "country": "country",
-            "description": "description",
-            "logo": "logo",
-            "social_media_linkedIn": "social_media_linkedIn",
-            "social_media_ig": "social_media_ig",
-            "social_media_X": "social_media_X",
-            "status": "status"
-        }
-        
-        # Copy mapped fields
-        for source, target in field_mapping.items():
-            if source in update_data and update_data[source] is not None:
-                db_update_data[target] = update_data[source]
-        
-        # Handle social_media field specifically if it's being updated
-        if 'social_media' in update_data and update_data['social_media']:
-            # Initialize social media fields
-            social_media_linkedIn = None
-            social_media_ig = None
-            social_media_X = None
+    def update(self, db: Session, *, company: Company, company_in: CompanyUpdate) -> Company:
+        try:
+            update_data = company_in.model_dump(exclude_unset=True)
             
-            # Map social media objects to their respective fields
-            for item in update_data['social_media']:
-                platform = item.get('platform', '').lower()
-                url = item.get('url', '')
-                
-                if 'linkedin' in platform:
-                    social_media_linkedIn = url
-                elif 'instagram' in platform or 'ig' in platform:
-                    social_media_ig = url
-                elif 'x' in platform or 'twitter' in platform:
-                    social_media_X = url
+            # Update direct fields
+            for field, value in update_data.items():
+                if hasattr(company, field) and value is not None:
+                    setattr(company, field, value)
             
-            # Add the mapped social media fields
-            if social_media_linkedIn:
-                db_update_data['social_media_linkedIn'] = social_media_linkedIn
-            if social_media_ig:
-                db_update_data['social_media_ig'] = social_media_ig
-            if social_media_X:
-                db_update_data['social_media_X'] = social_media_X
-        
-        # Handle services field - ensure it's an array
-        if 'services' in update_data:
-            db_update_data['services'] = update_data['services']
+            # Handle special cases
+            if 'services' in update_data:
+                company.services = update_data['services'] or []
                 
-        # Handle founders field - ensure it's a proper array
-        if 'founders' in update_data:
-            db_update_data['founders'] = update_data['founders']
-        
-        # Update the company with the processed data
-        for field, value in db_update_data.items():
-            setattr(company, field, value)
-        
-        db.add(company)
-        db.commit()
-        db.refresh(company)
-        return company
+            if 'founders' in update_data:
+                company.founders = update_data['founders'] or []
+                
+            db.add(company)
+            db.commit()
+            db.refresh(company)
+            
+            return company
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to update company: {str(e)}"
+            )
 
     def delete(self, db: Session, *, company_id: str) -> Company:
         """Soft delete a company by setting status to inactive"""
@@ -277,12 +226,12 @@ class CompanyService(Service):
         page: int = DEFAULT_PAGE,
         per_page: int = DEFAULT_PER_PAGE
     ) -> Tuple[List[Company], int]:
-        """Search companies with pagination and filters"""
+        """Search companies with pagination and filters using simplified JSON array access"""
         
         # Base query
         query = db.query(
             Company.id,
-            Company.company_name.label("name"),  # Alias company_name → name
+            Company.company_name.label("name"),
             Company.company_website.label("website"),
             Company.last_funding_date.label("lastFundingDate"),
             Company.company_size.label("employees"),
@@ -297,57 +246,41 @@ class CompanyService(Service):
         
         # Text search
         if search_term:
-
-            jsonb_condition = text("""
-                jsonb_path_exists(services, :services_path) OR 
-                jsonb_path_exists(founders, :founders_path)
-            """).bindparams(
-                bindparam('services_path', value={
-                    "term": f"{search_term}",
-                    "path": '$[*] ? (@.name like_regex $term || ".*" flag "i" || @.description like_regex $term || ".*" flag "i")'
-                }, type_=JSONB),
-                bindparam('founders_path', value={
-                    "term": f"{search_term}",
-                    "path": '$[*] ? (@.name like_regex $term || ".*" flag "i" || @.role like_regex $term || ".*" flag "i" || @.bio like_regex $term || ".*" flag "i")'
-                }, type_=JSONB)
-            )
-
             name_filter = Company.company_name.ilike(f"%{search_term}%")
             desc_filter = Company.description.ilike(f"%{search_term}%")
             country_filter = Company.country.ilike(f"%{search_term}%")
             
-            # New service filter using JSONB path
-            # service_filter = func.jsonb_path_exists(
-            #     Company.services,
-            #     text("""$[*] ? (
-            #         @.name like_regex :term || '.*' flag "i" || 
-            #         @.description like_regex :term || '.*' flag "i"
-            #     )"""),  # Handles partial matches
-            #     {'term': search_term}
-            # )
-
-            # founder_filter = func.jsonb_path_exists(
-            #     Company.founders,
-            #     text("""$[*] ? (
-            #         @.name like_regex :term || '.*' flag "i" ||
-            #         @.role like_regex :term || '.*' flag "i" ||
-            #         @.bio like_regex :term || '.*' flag "i"
-            #     )"""),
-            #     {'term': search_term}
-            # )
+            # Direct array access using EXISTS with array_elements
+            services_filter = text("""
+                EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(services) AS service
+                    WHERE 
+                        service->>'name' ILIKE :search_term OR
+                        service->>'description' ILIKE :search_term
+                )
+            """).bindparams(search_term=f"%{search_term}%")
+            
+            founders_filter = text("""
+                EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(founders) AS founder
+                    WHERE 
+                        founder->>'name' ILIKE :search_term OR
+                        founder->>'role' ILIKE :search_term OR
+                        founder->>'bio' ILIKE :search_term
+                )
+            """).bindparams(search_term=f"%{search_term}%")
             
             query = query.filter(or_(
-            name_filter,
-            desc_filter,
-            country_filter,
-            jsonb_condition
-        )
-            )
+                name_filter,
+                desc_filter,
+                country_filter,
+                services_filter,
+                founders_filter
+            ))
         
         # Apply filters
         if country:
             countries = [country.strip() for country in country.split(",")]
-            # Use OR condition for multiple countries
             country_filters = [Company.country.ilike(f"%{c}%") for c in countries]
             query = query.filter(or_(*country_filters))
         

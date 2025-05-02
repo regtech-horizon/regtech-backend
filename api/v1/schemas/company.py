@@ -1,6 +1,6 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
 
 class Social(BaseModel):
@@ -16,16 +16,17 @@ class CompanyFounder(BaseModel):
     social: Optional[Social] = None
 
 class SocialMedia(BaseModel):
-    platform : str
-    url : str
+    platform: str
+    url: str
 
 class ServiceModel(BaseModel):
     name: str
     description: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-        validate_by_name = True
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        validate_assignment=True
+    )
 
 class CompanyBase(BaseModel):
     acquisitions: Optional[int] = None
@@ -38,24 +39,30 @@ class CompanyBase(BaseModel):
     year_founded: Optional[int] = None
     headquarters: Optional[str] = None
     social_media: Optional[List[SocialMedia]] = None
-    services: Optional[List[ServiceModel]] = None
+    services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     description: Optional[str] = None
     logo: Optional[str] = None
     status: Optional[str] = "active"
     last_funding_date: Optional[str] = None
     niche: Optional[str] = None
-    founders: Optional[List[CompanyFounder]] = None
+    founders: Optional[List[CompanyFounder]] = None  # Changed from JSONB to List
+
+    model_config = ConfigDict(
+        extra="ignore",  # Ignore extra fields
+        protected_namespaces=(),
+        arbitrary_types_allowed=True,
+        from_attributes=True
+    )
 
 class CompanyCreate(CompanyBase):
     pass
 
 class CompanyUpdate(BaseModel):
-    name: Optional[str] = None
+    company_name: Optional[str] = None
     company_type: Optional[str] = None
-    contact_name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    website: Optional[str] = None
+    company_email: Optional[EmailStr] = None
+    company_phone: Optional[str] = None
+    company_website: Optional[str] = None
     company_size: Optional[str] = None
     year_founded: Optional[int] = None
     headquarters: Optional[str] = None
@@ -67,6 +74,14 @@ class CompanyUpdate(BaseModel):
     social_media_X: Optional[str] = None
     status: Optional[str] = None
     founders: Optional[List[CompanyFounder]] = None
+    niche: Optional[str] = None
+    acquisitions: Optional[int] = None
+    last_funding_date: Optional[str] = None
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        from_attributes=True
+    )
 
 class CompanyLogin(BaseModel):
     email: EmailStr
@@ -78,8 +93,11 @@ class CompanyInDB(CompanyBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    company_password: str = Field(exclude=True)
+    
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 class CompanyData(BaseModel):
     id: str
@@ -93,8 +111,8 @@ class CompanyData(BaseModel):
     year_founded: Optional[int] = None
     headquarters: Optional[str] = None
     description: Optional[str] = None
-    founders: Optional[List[CompanyFounder]] = None
-    services: Optional[List[ServiceModel]] = None
+    founders: Optional[List[CompanyFounder]] = None  # Changed from JSONB to List
+    services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     logo: Optional[str] = None
     social_media_linkedIn: Optional[str] = None
     social_media_ig: Optional[str] = None
@@ -104,14 +122,16 @@ class CompanyData(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        from_attributes=True
+    )
 
 class CompanyResponse(BaseModel):
     status: str
     status_code: int
     message: str
-    data: CompanyData
+    data: CompanyInDB
 
 class AllCompaniesResponse(BaseModel):
     status: str
@@ -122,12 +142,12 @@ class AllCompaniesResponse(BaseModel):
     total: int
     data: List[CompanyData]
 
-
 class CompanyListResponse(BaseModel):
     id: str
     name: str  # Matches the SQLAlchemy label
     website: Optional[str] = None
-    services: List[ServiceModel] = []
+    founders: Optional[List[CompanyFounder]] = None  # Changed from JSONB to List
+    services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     lastFundingDate: Optional[datetime] = None
     employees: Optional[str] = None
     acquisitions: Optional[int] = None
@@ -136,9 +156,10 @@ class CompanyListResponse(BaseModel):
     logo: Optional[str] = None
     niche: Optional[str] = None
 
-    class Config:
-        from_attributes = True
-        validate_by_name = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        from_attributes=True
+    )
 
 class PaginationData(BaseModel):
     page: int
@@ -157,18 +178,21 @@ class CompanySearchItem(BaseModel):
     country: Optional[str] = None
     logo: Optional[str] = None
     niche: Optional[str] = None
-    services: Optional[List[dict]] = []
-    founders: Optional[List[dict]] = []
+    founders: Optional[List[CompanyFounder]] = None  # Changed from JSONB to List
+    services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True,
+        arbitrary_types_allowed=True
+    )
 
 class CompanySearchResponse(BaseModel):
     data: List[CompanySearchItem]
     pagination: PaginationData
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 class SuccessResponse(BaseModel):
     status: str

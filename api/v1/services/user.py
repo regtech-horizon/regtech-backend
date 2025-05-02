@@ -282,8 +282,6 @@ class UserService(Service):
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
-        print(access_token)
 
         token = self.verify_access_token(access_token, credentials_exception)
         
@@ -291,7 +289,6 @@ class UserService(Service):
             # Convert string `user_id` to UUID
             # user_uuid = UUID(token.user_id)  # <-- Use `user_id`
             user_uuid = (token.user_id)  # <-- Use `user_id`
-            print(user_uuid)
         except ValueError:
             raise credentials_exception
 

@@ -1,6 +1,7 @@
 from typing import List, Optional
 from fastapi import Depends, APIRouter, Request, status, Query, HTTPException
 from fastapi.encoders import jsonable_encoder
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from api.utils.success_response import success_response
@@ -9,6 +10,7 @@ from api.v1.schemas.company import (
     CompanyCreate,
     CompanyFounder,
     CompanyLogin,
+    CompanyResponse,
     CompanyUpdate,
     CompanyInDB,
     CompanyListResponse,
@@ -97,7 +99,7 @@ async def get_all_companies(
     }
 
 
-@company_router.get("/{company_id}", response_model=SuccessResponse)
+@company_router.get("/{company_id}", response_model=CompanyResponse)
 async def get_company(
     company_id: str,
     db: Session = Depends(get_db),
@@ -105,23 +107,26 @@ async def get_company(
 ):
     company = company_service.get_company(db, company_id=company_id)
     if not company:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,      
-            detail="Company not found"
-        )
-    return success_response(
-        status_code=status.HTTP_200_OK,
-        message="Company retrieved successfully",
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    # Ensure we're not returning sensitive data
+    return CompanyResponse(
+        status="success",
+        status_code=200,
+        message="Company retrieved",
         data=company
     )
 
 @company_router.put("/{company_id}")
 async def update_company(
     company_id: str,
-    schema: CompanyUpdate,
+    request_data: dict,  # Receive raw request data
     db: Session = Depends(get_db),
     current_user: User = Depends(user_service.get_current_user)
 ):
+    # Extract apiData if it exists, otherwise use the whole request
+    update_data = request_data.get('apiData', request_data)
+    
     company = company_service.get_company(db, company_id=company_id)
     if not company:
         raise HTTPException(
@@ -136,13 +141,21 @@ async def update_company(
             detail="You don't have permission to update this company"
         )
     
-    updated_company = company_service.update(db, company=company, company_in=schema)
+    # Convert to CompanyUpdate schema
+    try:
+        update_schema = CompanyUpdate(**update_data)
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.errors()
+        )
+    
+    updated_company = company_service.update(db, company=company, company_in=update_schema)
     return success_response(
         status_code=status.HTTP_200_OK,
         message="Company updated successfully",
         data=updated_company
     )
-
 
 @company_router.get("/creator/me", response_model=ListSuccessResponse)
 async def get_my_companies(

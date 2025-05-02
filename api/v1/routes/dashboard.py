@@ -82,7 +82,8 @@ async def get_dashboard_data(
                 "name": comp.company_name,
                 "niche": comp.niche or "Not specified",
                 "lastUpdated": comp.updated_at.strftime("%b %d, %Y"),
-                "status": "active"  # Replace with actual status logic
+                "status": comp.status,  # Replace with actual status logic
+                "logo": comp.logo,
             }
             for comp in companies
         ]
@@ -91,6 +92,7 @@ async def get_dashboard_data(
             status_code=200,
             message="Dashboard data retrieved successfully",
             data={
+                "user": current_user,
                 "stats": stats,
                 # "recentActivities": formatted_activities,
                 "notifications": formatted_notifications,
