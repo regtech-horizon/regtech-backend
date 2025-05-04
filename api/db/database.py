@@ -1,55 +1,49 @@
-""" The database module
-"""
-from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base
-from sqlalchemy import create_engine
-from api.utils.settings import settings, BASE_DIR
+from decouple import config
+from sqlalchemy.engine import URL, create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
+# Read raw values from .env
+DB_USER = config('DB_USER')           # e.g. "regtechuser"
+DB_PASS = config('DB_PASSWORD')           # e.g. "Regtech@25"
+DB_HOST = config('DB_HOST', default='db')
+DB_PORT = config('DB_PORT', cast=int, default=5432)
+DB_NAME = config('DB_NAME', default='regtech')
 
-DB_HOST = settings.DB_HOST
-DB_PORT = settings.DB_PORT
-DB_USER = settings.DB_USER
-DB_PASSWORD = settings.DB_PASSWORD
-DB_NAME = settings.DB_NAME
-DB_TYPE = settings.DB_TYPE
+# Build a safe URL; URL.create handles percent-encoding internally
+db_url = URL.create(
+    drivername="postgresql+psycopg2",
+    username=DB_USER,
+    password=DB_PASS,
+    host=DB_HOST,
+    port=DB_PORT,
+    database=DB_NAME,
+)
 
+# Create engine and session factory
+engine = create_engine(db_url, pool_pre_ping=True)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
-def get_db_engine(test_mode: bool = False):
-    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-    if DB_TYPE == "sqlite" or test_mode:
-        BASE_PATH = f"sqlite:///{BASE_DIR}"
-        DATABASE_URL = BASE_PATH + "/"
-
-        if test_mode:
-            DATABASE_URL = BASE_PATH + "test.db"
-
-            return create_engine(
-                DATABASE_URL, connect_args={"check_same_thread": False}
-            )
-    elif DB_TYPE == "postgresql":
-        DATABASE_URL = (
-            f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-        )
-
-    return create_engine(DATABASE_URL)
-
-
-engine = get_db_engine()
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-db_session = scoped_session(SessionLocal)
-
+# Base class for ORM models
 Base = declarative_base()
 
-
-def create_database():
-    return Base.metadata.create_all(bind=engine)
-
-
 def get_db():
-    db = db_session()
+    """
+    FastAPI dependency: yield a database session, then close it.
+    """
+    db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+def init_db():
+    """
+    Initialize all tables (call at startup or in migrations).
+    """
+    Base.metadata.create_all(bind=engine)
+
