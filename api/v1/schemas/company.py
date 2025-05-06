@@ -31,7 +31,7 @@ class ServiceModel(BaseModel):
 class CompanyBase(BaseModel):
     acquisitions: Optional[int] = None
     company_type: Optional[str] = None
-    company_name: Optional[str] = None
+    contact_name: Optional[str] = None
     company_email: Optional[EmailStr] = None
     company_phone: Optional[str] = None
     company_website: Optional[str] = None
@@ -103,7 +103,7 @@ class CompanyData(BaseModel):
     id: str
     name: str
     company_type: Optional[str] = None
-    contact_name: Optional[str] = None
+    company_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     website: Optional[str] = None
@@ -118,6 +118,8 @@ class CompanyData(BaseModel):
     social_media_ig: Optional[str] = None
     social_media_X: Optional[str] = None
     status: str
+    last_funding_date: Optional[str] = None
+    niche: Optional[str] = None
     creator_id: str
     created_at: datetime
     updated_at: datetime
@@ -132,6 +134,12 @@ class CompanyResponse(BaseModel):
     status_code: int
     message: str
     data: CompanyInDB
+
+class CompanyResponseData(BaseModel):
+    status: str
+    status_code: int
+    message: str
+    data: CompanyData
 
 class AllCompaniesResponse(BaseModel):
     status: str

@@ -42,7 +42,8 @@ TEMPLATE_DIR = os.path.join(BASE_DIR, "api/core/dependencies/email/templates")
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
-    "https://regtech-demo.vercel.app"
+    "https://regtech-demo.vercel.app",
+    "https://app.regtechhorizon.com"
 ]
 
 
@@ -75,6 +76,12 @@ async def get_root(request: Request) -> dict:
     )
 
 
+from fastapi import APIRouter
+router = APIRouter()
+
+@router.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 
 STATIC_DIR = "static/profile_images"

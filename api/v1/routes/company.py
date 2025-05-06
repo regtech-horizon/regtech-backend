@@ -10,6 +10,8 @@ from api.v1.schemas.company import (
     CompanyCreate,
     CompanyFounder,
     CompanyLogin,
+    CompanyResponseData,
+    CompanyData,
     CompanyResponse,
     CompanyUpdate,
     CompanyInDB,
@@ -99,7 +101,7 @@ async def get_all_companies(
     }
 
 
-@company_router.get("/{company_id}", response_model=CompanyResponse)
+@company_router.get("/{company_id}", response_model=CompanyResponseData)
 async def get_company(
     company_id: str,
     db: Session = Depends(get_db),
@@ -109,12 +111,35 @@ async def get_company(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     
+    company_data = CompanyData(
+        id=str(company.id),
+        name=company.company_name,  # Map company_name to name
+        company_type=company.company_type,
+        email=company.company_email,
+        phone=company.company_phone,
+        website=company.company_website,
+        company_size=company.company_size,
+        year_founded=company.year_founded,
+        headquarters=company.headquarters,
+        description=company.description,
+        founders=company.founders,
+        services=company.services,
+        logo=company.logo,
+        country=company.country,
+        last_funding_date=company.last_funding_date,
+        niche=company.niche,
+        status=company.status or "active",
+        creator_id=str(company.creator_id),
+        created_at=company.created_at,
+        updated_at=company.updated_at
+    )
+
     # Ensure we're not returning sensitive data
-    return CompanyResponse(
+    return CompanyResponseData(
         status="success",
         status_code=200,
         message="Company retrieved",
-        data=company
+        data=company_data
     )
 
 @company_router.put("/{company_id}")
