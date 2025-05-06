@@ -7,6 +7,18 @@ import json
 from api.v1.models.company import Company
 from api.v1.schemas.company import CompanyCreate, CompanyUpdate, CompanyInDB, CompanyLogin
 from api.core.base.services import Service
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()  # Outputs to console
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE = 1
 DEFAULT_PER_PAGE = 10  # We had used 10 items per page
@@ -226,7 +238,7 @@ class CompanyService(Service):
         page: int = DEFAULT_PAGE,
         per_page: int = DEFAULT_PER_PAGE
     ) -> Tuple[List[Company], int]:
-        """Search companies with pagination and filters using simplified JSON array access"""
+        """Search companies with pagination and filters with safe JSON array handling"""
         
         # Base query
         query = db.query(
@@ -250,8 +262,9 @@ class CompanyService(Service):
             desc_filter = Company.description.ilike(f"%{search_term}%")
             country_filter = Company.country.ilike(f"%{search_term}%")
             
-            # Direct array access using EXISTS with array_elements
+            # Safe array access using EXISTS with array_elements and type checking
             services_filter = text("""
+                jsonb_typeof(services) = 'array' AND
                 EXISTS (
                     SELECT 1 FROM jsonb_array_elements(services) AS service
                     WHERE 
@@ -261,6 +274,7 @@ class CompanyService(Service):
             """).bindparams(search_term=f"%{search_term}%")
             
             founders_filter = text("""
+                jsonb_typeof(founders) = 'array' AND
                 EXISTS (
                     SELECT 1 FROM jsonb_array_elements(founders) AS founder
                     WHERE 
@@ -310,14 +324,23 @@ class CompanyService(Service):
         else:  # relevance
             query = query.order_by(Company.created_at.desc())
         
-        # Get total count before pagination
-        total_count = query.count()
+        # Get total count before pagination - Using a safer approach to count
+        try:
+            subquery = query.subquery()
+            total_count = db.query(func.count()).select_from(subquery).scalar()
+        except Exception as e:
+            logger.error(f"Error counting results: {str(e)}")
+            total_count = 0
         
         # Apply pagination
-        companies = query.offset((page - 1) * per_page).limit(per_page).all()
+        try:
+            companies = query.offset((page - 1) * per_page).limit(per_page).all()
+        except Exception as e:
+            logger.error(f"Error fetching companies: {str(e)}")
+            companies = []
         
         return companies, total_count
-
+    
     def get_company(self, db: Session, *, company_id: str) -> Company:
         """Get a company by ID."""
         company = db.query(Company).filter(Company.id == company_id).first()
