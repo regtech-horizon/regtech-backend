@@ -47,15 +47,15 @@ origins = [
 ]
 
 
-app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # expose_headers=["*"]
 )
+
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
 app.include_router(api_version_one)
 app.include_router(webhook_router)
