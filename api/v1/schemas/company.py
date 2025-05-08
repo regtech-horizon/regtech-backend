@@ -158,6 +158,9 @@ class CompanyListResponse(BaseModel):
     services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     lastFundingDate: Optional[datetime] = None
     employees: Optional[str] = None
+    description: Optional[str] = None
+    year_founded: Optional[int] = None
+    headquarters: Optional[str] = None
     acquisitions: Optional[int] = None
     type: Optional[str] = None
     country: Optional[str] = None
@@ -225,7 +228,7 @@ class CompanyChangePasswordSchema(BaseModel):
     new_password: str = Field(..., description="New company password")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "current_password": "oldPassword123",
                 "new_password": "newSecurePassword456"

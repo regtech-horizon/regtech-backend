@@ -158,6 +158,9 @@ class CompanyService(Service):
                 "website": company.company_website,
                 "services": services_array,  # Use the properly formatted array
                 "lastFundingDate": company.last_funding_date,
+                "description": company.description,
+                "headquarters": company.headquarters,
+                "year_founded": company.year_founded,
                 "employees": company.company_size,
                 "acquisitions": 0,  # Placeholder for actual logic
                 "niche": company.niche,
