@@ -31,7 +31,7 @@ class ServiceModel(BaseModel):
 class CompanyBase(BaseModel):
     acquisitions: Optional[int] = None
     company_type: Optional[str] = None
-    contact_name: Optional[str] = None
+    company_name: Optional[str] = None
     company_email: Optional[EmailStr] = None
     company_phone: Optional[str] = None
     company_website: Optional[str] = None

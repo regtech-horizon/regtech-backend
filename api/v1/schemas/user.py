@@ -404,3 +404,80 @@ class UserRoleSchema(BaseModel):
         if value not in ["admin", "user", "guest", "owner"]:
             raise ValueError("Role has to be one of admin, guest, user, or owner")
         return value
+
+
+class AdminCreate(BaseModel):
+    """Schema to create an admin user"""
+
+    email: EmailStr
+    phone_number: Optional[str] = None
+    password: Annotated[
+        str, StringConstraints(
+            min_length=8,
+            max_length=64,
+            strip_whitespace=True
+        )
+    ]
+    confirm_password: Annotated[
+        str, 
+        StringConstraints(
+            min_length=8,
+            max_length=64,
+            strip_whitespace=True
+        ),
+        Field(exclude=True)  # exclude confirm_password field
+    ]
+    first_name: Annotated[
+        str, StringConstraints(
+            min_length=3,
+            max_length=30,
+            strip_whitespace=True
+        )
+    ]
+    last_name: Annotated[
+        str, StringConstraints(
+            min_length=3,
+            max_length=30,
+            strip_whitespace=True
+        )
+    ]
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_password(cls, values: dict):
+        """
+        Validates passwords
+        """
+        password = values.get('password')
+        confirm_password = values.get('confirm_password') # gets the confirm password
+        email = values.get("email")
+
+        # constraints for password
+        if not any(c.islower() for c in password):
+            raise ValueError("password must include at least one lowercase character")
+        if not any(c.isupper() for c in password):
+            raise ValueError("password must include at least one uppercase character")
+        if not any(c.isdigit() for c in password):
+            raise ValueError("password must include at least one digit")
+        if not any(c in ['!','@','#','$','%','&','*','?','_','-'] for c in password):
+            raise ValueError("password must include at least one special character")
+
+        """Confirm Password Validation"""
+
+        if not confirm_password:
+            raise ValueError("Confirm password field is required")
+        elif password != confirm_password:
+            raise ValueError("Passwords do not match")
+        
+        try:
+            email = validate_email(email, check_deliverability=True)
+            if email.domain.count(".com") > 1:
+                raise EmailNotValidError("Email address contains multiple '.com' endings.")
+            if not validate_mx_record(email.domain):
+                raise ValueError('Email is invalid')
+        except EmailNotValidError as exc:
+            raise ValueError(exc) from exc
+        except Exception as exc:
+            raise ValueError(exc) from exc
+        
+        return values

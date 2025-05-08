@@ -320,7 +320,7 @@ class UserService(Service):
         return encoded_jwt
 
 
-    def create_admin(self, db: Session, schema: user.UserCreate):
+    def create_admin(self, db: Session, schema: user.AdminCreate):
         """Creates a new admin"""
 
         if db.query(User).filter(User.email == schema.email).first():

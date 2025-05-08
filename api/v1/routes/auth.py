@@ -21,7 +21,7 @@ from typing import Annotated
 from api.core.dependencies.email_sender import send_email
 from api.utils.success_response import auth_response, success_response
 from api.v1.models import User
-from api.v1.schemas.user import Token, UserEmailSender
+from api.v1.schemas.user import AdminCreate, Token, UserEmailSender
 from api.v1.schemas.user import (
     LoginRequest,
     UserCreate,
@@ -81,7 +81,7 @@ def register(
 
 @auth.post(path="/register-admin", status_code=status.HTTP_201_CREATED, response_model=auth_response)
 def register_as_super_admin(
-    request: Request, user: UserCreate, db: Session = Depends(get_db)
+    request: Request, user: AdminCreate, db: Session = Depends(get_db)
 ):
     """Endpoint for super admin creation"""
 

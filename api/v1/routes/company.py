@@ -129,6 +129,9 @@ async def get_company(
         last_funding_date=company.last_funding_date,
         niche=company.niche,
         status=company.status or "active",
+        social_media_linkedIn= company.social_media_linkedIn,
+        social_media_ig=company.social_media_ig,
+        social_media_X=company.social_media_X,
         creator_id=str(company.creator_id),
         created_at=company.created_at,
         updated_at=company.updated_at

@@ -261,6 +261,7 @@ class CompanyService(Service):
             name_filter = Company.company_name.ilike(f"%{search_term}%")
             desc_filter = Company.description.ilike(f"%{search_term}%")
             country_filter = Company.country.ilike(f"%{search_term}%")
+            niche_filter = Company.niche.ilike(f"%{search_term}%")
             
             # Safe array access using EXISTS with array_elements and type checking
             services_filter = text("""
@@ -288,6 +289,7 @@ class CompanyService(Service):
                 name_filter,
                 desc_filter,
                 country_filter,
+                niche_filter,
                 services_filter,
                 founders_filter
             ))
