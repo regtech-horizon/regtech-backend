@@ -354,3 +354,42 @@ class CompanyService(Service):
         return company
 
 company_service = CompanyService()
+
+def change_password(
+    self,
+    db: Session,
+    company: Company,
+    current_password: str,
+    new_password: str
+):
+    """
+    Change company password
+    
+    Args:
+        db: Database session
+        company: Company object
+        current_password: Current password
+        new_password: New password to set
+        
+    Raises:
+        HTTPException: If the current password is incorrect
+        HTTPException: If the new password is the same as the current password
+    """
+    # Verify current password matches
+    if company.company_password != current_password:
+        raise HTTPException(
+            status_code=400, 
+            detail="Incorrect current password"
+        )
+    
+    # Check if new password is different from current
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Current Password and New Password cannot be the same"
+        )
+    
+    # Update password
+    company.company_password = new_password
+    db.commit()
+    db.refresh(company)

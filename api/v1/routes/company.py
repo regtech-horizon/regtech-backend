@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from api.utils.success_response import success_response
 from api.v1.models.user import User
 from api.v1.schemas.company import (
+    CompanyChangePasswordSchema,
     CompanyCreate,
     CompanyFounder,
     CompanyLogin,
@@ -282,3 +283,49 @@ async def delete_company(
         message="Company deleted successfully",
         data=deleted_company
     )
+
+
+@company_router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_company_password(
+    schema: CompanyChangePasswordSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(user_service.get_current_user),
+    company_id: str = Query(..., description="ID of the company to change password for")
+):
+    """
+    Change a company's password
+    
+    Args:
+        schema: The password change schema containing current and new passwords
+        db: Database session
+        current_user: Currently authenticated user
+        company_id: ID of the company to update
+        
+    Returns:
+        Success message
+        
+    Raises:
+        HTTPException: 404 if company not found
+        HTTPException: 403 if user doesn't have permission
+        HTTPException: 400 if current password is incorrect
+        HTTPException: 422 if new password is same as current
+    """
+    # Get the company
+    company = company_service.get_company(db, company_id=company_id)
+    
+    # Check if current user has permission (company creator)
+    if str(company.creator_id) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to change this company's password"
+        )
+    
+    # Change password
+    company_service.change_password(
+        db=db,
+        company=company,
+        current_password=schema.current_password,
+        new_password=schema.new_password
+    )
+    
+    return {"message": "Company password updated successfully"}

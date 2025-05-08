@@ -218,3 +218,16 @@ class CompanySearch(BaseModel):
     niche: Optional[str] = None
     year_founded: Optional[int] = None
     search_term: Optional[str] = None
+
+class CompanyChangePasswordSchema(BaseModel):
+    """Schema for changing company password"""
+    current_password: str = Field(..., description="Current company password")
+    new_password: str = Field(..., description="New company password")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "current_password": "oldPassword123",
+                "new_password": "newSecurePassword456"
+            }
+        }
