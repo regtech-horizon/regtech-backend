@@ -39,6 +39,22 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Get absolute path
 TEMPLATE_DIR = os.path.join(BASE_DIR, "api/core/dependencies/email/templates")
 
+origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://regtech-demo.vercel.app",
+    "https://app.regtechhorizon.com"
+]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
 app.include_router(api_version_one)
