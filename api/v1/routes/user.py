@@ -103,7 +103,7 @@ def update_current_user(
     user = user_service.update(db=db, schema= schema, current_user=current_user)
 
     
-    message = f"The following data has been updated successfully: {', '.join([key for key in schema.dict() if schema.dict()[key] is not None])}"
+    message = f"The Profile data was updated successfully"
     notification_service.create_notification(
         title="User Updated", 
         message=message, 

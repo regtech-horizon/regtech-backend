@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     ALGORITHM: str = config("ALGORITHM")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = config("ACCESS_TOKEN_EXPIRE_MINUTES")
     JWT_REFRESH_EXPIRY: int = config("JWT_REFRESH_EXPIRY")
+    
+    MAIL_USERNAME:str = config("MAIL_USERNAME")
+    MAIL_PASSWORD:str = config("MAIL_PASSWORD")
+    MAIL_FROM:str = config("MAIL_FROM")
+    MAIL_PORT: int = config("MAIL_PORT")
+    MAIL_SERVER:str = config("MAIL_SERVER")
+    MAIL_FROM_NAME:str = config("MAIL_FROM_NAME")
+    MAIL_STARTTLS: bool = config("MAIL_STARTTLS", cast=bool)
+    MAIL_SSL_TLS: bool = config("MAIL_SSL_TLS", cast=bool)
+    USE_CREDENTIALS: bool = config("USE_CREDENTIALS", cast=bool)
+    VALIDATE_CERTS: bool = config("VALIDATE_CERTS", cast=bool)
 
     # Database configurations
     DB_HOST: str = config("DB_HOST")

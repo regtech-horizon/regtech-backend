@@ -16,8 +16,10 @@ from api.db.database import get_db
 from api.utils.db_validators import check_model_existence
 from api.v1.models import User
 from api.v1.schemas import user
+from api.v1.schemas.user import UserStatus
 from api.utils.settings import settings
 from jose import jwt, JWTError
+from enum import Enum
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -392,6 +394,23 @@ class UserService(Service):
             )
         
         return user
+        
+    def update_status(
+        db: Session,
+        user: User,
+        status: str
+    ):
+        if status not in UserStatus.__members__.values():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Must be one of: {', '.join([s.value for s in UserStatus])}"
+            )
+
+        user.status = status
+        db.commit()
+        db.refresh(user)
+        return user
 
 
+    
 user_service = UserService()

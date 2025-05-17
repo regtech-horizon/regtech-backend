@@ -8,7 +8,7 @@ class PaymentBase(BaseModel):
     subscription_id: str
     amount: float
     payment_method: str
-    status: str = "pending"
+    status: str
     invoice_url: Optional[str] = None
 
 class PaymentCreate(PaymentBase):

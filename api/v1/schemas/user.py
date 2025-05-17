@@ -11,6 +11,7 @@ from pydantic import (BaseModel, EmailStr,
                       model_validator)
                       
 from pydantic import Field  # Added this import
+from enum import Enum
 
 def validate_mx_record(domain: str):
     """
@@ -481,3 +482,9 @@ class AdminCreate(BaseModel):
             raise ValueError(exc) from exc
         
         return values
+    
+class UserStatus(BaseModel):
+    active: str = "active"
+    inactive: str = "inactive"
+    pending: str = "pending"
+    completed: str = "completed"

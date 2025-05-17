@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from jose import ExpiredSignatureError, JWTError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from api.v1.models.mail import create_message, mail
 
 from fastapi import (
     BackgroundTasks,
@@ -21,6 +22,7 @@ from typing import Annotated
 from api.core.dependencies.email_sender import send_email
 from api.utils.success_response import auth_response, success_response
 from api.v1.models import User
+from api.v1.schemas.mail import EmailModel
 from api.v1.schemas.user import AdminCreate, Token, UserEmailSender
 from api.v1.schemas.user import (
     LoginRequest,
@@ -168,4 +170,100 @@ def logout(
 
     return response
 
+@auth.post('/send-mail')
+async def send_mail(emails: EmailModel):
+    emails = emails.email_addresses
+    html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="UTF-8">
+        <title>Regtech Horizon Email</title>
+        <style>
+            body {
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #000000;
+            }
+            .container {
+            max-width: 600px;
+            margin: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(173, 0, 0, 0.2);
+            }
+            .header {
+            background-color: #AD0000;
+            color: #ffffff;
+            text-align: center;
+            padding: 24px 20px;
+            }
+            .header h1 {
+            margin: 0;
+            font-size: 26px;
+            letter-spacing: 1px;
+            }
+            .body {
+            padding: 24px 20px;
+            background-color: #ffffff;
+            }
+            .body h2 {
+            color: #AD0000;
+            margin-top: 0;
+            }
+            .footer {
+            background-color: #f7f7f7;
+            text-align: center;
+            font-size: 12px;
+            padding: 16px 20px;
+            color: #555555;
+            }
+            .button {
+            display: inline-block;
+            background-color: #AD0000;
+            color: #ffffff !important;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 20px;
+            }
+            @media (max-width: 600px) {
+            .body, .header, .footer {
+                padding: 16px;
+            }
+            }
+        </style>
+        </head>
+        <body>
+        <div class="container">
+            <div class="header">
+            <h1>Welcome to Regtech Horizon</h1>
+            </div>
+            <div class="body">
+            <h2>Hello,</h2>
+            <p>We're thrilled to have you on board at <strong>Regtech Horizon</strong> – where innovation meets compliance.</p>
+            <p>This is your gateway to the future of regulatory technology. Whether you're here to streamline processes, ensure compliance, or explore powerful insights — you've just taken a giant leap forward.</p>
+            <p>Stay tuned. The horizon just got closer.</p>
+            <a href="https://app.regtechhorizon.com" class="button">Get Started</a>
+            </div>
+            <div class="footer">
+            &copy; 2025 Regtech Horizon. All rights reserved.<br>
+            This is an automated email. Please do not reply.
+            </div>
+        </div>
+        </body>
+        </html>
+        """
+    message = create_message(
+        recipients=emails,
+        subject="Welcome to Regtech Horizon",
+        body=html
+    )
 
+    await mail.send_message(message)
+
+    return {"message": "Email sent successfully"}

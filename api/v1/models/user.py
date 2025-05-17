@@ -20,7 +20,7 @@ class User(BaseTableModel):
     is_deleted = Column(Boolean, server_default=text("false"))
     # is_verified = Column(Boolean, server_default=text("false"))
     role = Column(String, nullable=False, default="user")
-    status = Column(String, nullable=False, default="active")
+    status = Column(String, nullable=False, default="pending")
     subscription = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
 

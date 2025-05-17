@@ -42,7 +42,7 @@ class CompanyBase(BaseModel):
     services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     description: Optional[str] = None
     logo: Optional[str] = None
-    status: Optional[str] = "active"
+    status: Optional[str]
     last_funding_date: Optional[str] = None
     niche: Optional[str] = None
     founders: Optional[List[CompanyFounder]] = None  # Changed from JSONB to List
