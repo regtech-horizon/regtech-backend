@@ -7,6 +7,7 @@ import json
 from api.v1.models.company import Company
 from api.v1.schemas.company import CompanyCreate, CompanyUpdate, CompanyInDB, CompanyLogin
 from api.core.base.services import Service
+from api.v1.services.user import user_service
 import logging
 
 # Configure logging
@@ -62,14 +63,18 @@ class CompanyService(Service):
             "logo": "logo",
             "last_funding_date": "last_funding_date",
             "niche": "niche",
-            "company_password": "company_password"
+            "company_password": "company_password",
+            "country": "country"
         }
         
         # Copy mapped fields
         for source, target in field_mapping.items():
             if source in company_data and company_data[source] is not None:
-                db_company_data[target] = company_data[source]
-        
+                if source == "company_password":
+                    db_company_data[target] = user_service.hash_password(company_data[source])
+                else:
+                    db_company_data[target] = company_data[source]
+
         # Handle social_media field specifically
         if 'social_media' in company_data and company_data['social_media']:
             # Initialize social media fields
@@ -115,12 +120,16 @@ class CompanyService(Service):
     def fetch(self, db: Session, *, company_login: CompanyLogin, user_id: str) -> Optional[Company]:
         """Login in"""
         company = db.query(Company).filter(Company.company_email == company_login.email,
-        Company.creator_id == user_id,
-        Company.company_password == company_login.password).first()
+        Company.creator_id == user_id).first()
         if not company:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Company not found"
+            )
+        if not user_service.verify_password(company_login.password, company.company_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password"
             )
         return company
 

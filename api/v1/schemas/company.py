@@ -38,6 +38,7 @@ class CompanyBase(BaseModel):
     company_size: Optional[str] = None
     year_founded: Optional[int] = None
     headquarters: Optional[str] = None
+    country: Optional[str] = None
     social_media: Optional[List[SocialMedia]] = None
     services: Optional[List[ServiceModel]] = None  # Changed from JSONB to List
     description: Optional[str] = None
@@ -55,7 +56,7 @@ class CompanyBase(BaseModel):
     )
 
 class CompanyCreate(CompanyBase):
-    pass
+    company_password: Optional[str] = None
 
 class CompanyUpdate(BaseModel):
     company_name: Optional[str] = None
@@ -101,11 +102,11 @@ class CompanyInDB(CompanyBase):
 
 class CompanyData(BaseModel):
     id: str
-    name: str
     company_type: Optional[str] = None
-    company_name: Optional[str] = None
+    name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
+    country: Optional[str] = None
     website: Optional[str] = None
     company_size: Optional[str] = None
     year_founded: Optional[int] = None
