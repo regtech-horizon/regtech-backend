@@ -1,6 +1,6 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, validator
 from datetime import datetime
 
 class Social(BaseModel):
@@ -54,6 +54,16 @@ class CompanyBase(BaseModel):
         arbitrary_types_allowed=True,
         from_attributes=True
     )
+
+class CompanyStatusUpdate(BaseModel):
+    status: Literal["active", "inactive"]
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "status": "active"
+            }
+        }
 
 class CompanyCreate(CompanyBase):
     company_password: Optional[str] = None

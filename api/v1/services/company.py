@@ -1,7 +1,8 @@
 from typing import List, Optional, Tuple
 from sqlalchemy import func, text, or_
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordBearer
 from uuid_extensions import uuid7
 import json
 from api.v1.models.company import Company
@@ -20,6 +21,9 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 DEFAULT_PAGE = 1
 DEFAULT_PER_PAGE = 10  # We had used 10 items per page
@@ -363,6 +367,52 @@ class CompanyService(Service):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Company not found"
             )
+        return company
+    
+    def update_status(
+        self,
+        db: Session,
+        company: Company,
+        status: str,
+        current_user_id: str,
+        access_token: str = Depends(oauth2_scheme),
+    ):
+        """
+        Update company status
+        
+        Args:
+            db: Database session
+            company: Company object
+            status: New status to set (active/inactive)
+            current_user_id: ID of the user making the request
+            
+        Raises:
+            HTTPException: If the status is invalid
+            HTTPException: If the user is not authorized to change the status
+        """
+        # Check if status is valid
+        valid_statuses = ["active", "inactive"]
+        if status not in valid_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+            )
+        
+        # Check if user is authorized (creator or admin)
+        if company.creator_id != current_user_id:
+            # You'll need to check if the user is an admin here
+            # This implementation assumes you have a user_service.is_admin method
+            is_admin = user_service.get_current_super_admin(access_token=access_token, db=db)
+            if not is_admin:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Not authorized to update this company's status"
+                )
+        
+        # Update status
+        company.status = status
+        db.commit()
+        db.refresh(company)
         return company
 
 company_service = CompanyService()

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import Depends, APIRouter, Request, status, Query, HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
@@ -14,6 +14,7 @@ from api.v1.schemas.company import (
     CompanyResponseData,
     CompanyData,
     CompanyResponse,
+    CompanyStatusUpdate,
     CompanyUpdate,
     CompanyInDB,
     CompanyListResponse,
@@ -329,3 +330,34 @@ async def change_company_password(
     )
     
     return {"message": "Company password updated successfully"}
+
+@company_router.patch("/{company_id}/status", response_model=dict)
+def update_company_status(
+    company_id: str,
+    status_update: CompanyStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(user_service.get_current_user)
+) -> Any:
+    """
+    Update company status.
+    Only the company creator or an admin can update the status.
+    """
+    # Get the company
+    company = company_service.get_company(db, company_id=company_id)
+    
+    # Update the status
+    updated_company = company_service.update_status(
+        db=db,
+        company=company,
+        status=status_update.status,
+        current_user_id=current_user.id
+    )
+    
+    return {
+        "status": "success",
+        "message": f"Company status updated to {status_update.status}",
+        "data": {
+            "company_id": updated_company.id,
+            "status": updated_company.status
+        }
+    }
